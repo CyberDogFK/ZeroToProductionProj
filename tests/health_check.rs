@@ -123,7 +123,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await
-        .expect("Failed t ocreate database.");
+        .expect("Failed to create database.");
 
     let connection_pool = PgPool::connect(config.connection_string().expose_secret())
         .await
