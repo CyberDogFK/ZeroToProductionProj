@@ -8,3 +8,8 @@ database:
   password: "password"
   database_name: "newsletter"
   require_ssl: true
+email_client:
+  base_url: "localhost"
+  sender_email: "test@gmail.com"
+  authorization_token: "E662D7B5D5A0B30F0A10AD0B3B06FDA36C1EBC2C52E238E4EE54F90C85CDA3539A9551B6B563495E554BF3119C5D7A06"
+  timeout_milliseconds: 10000

@@ -4,3 +4,6 @@ application:
 #database:
 #  host: "172.19.0.3"
 #  port: 5432
+email_client:
+  base_url: "https://api.elasticemail.com"
+  sender_email: "something@gmail.com"
