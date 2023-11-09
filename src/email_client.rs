@@ -9,6 +9,18 @@ pub struct EmailClient {
     authorization_token: Secret<String>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ElasticEmailParameters<'a> {
+    apikey: &'a str,
+    subject: &'a str,
+    from: &'a str,
+    to: &'a str,
+    #[serde(rename = "bodyHtml")]
+    body_html: &'a str,
+    #[serde(rename = "bodyText")]
+    body_text: &'a str,
+}
+
 impl EmailClient {
     pub fn new(
         base_url: String,
@@ -16,10 +28,7 @@ impl EmailClient {
         authorization_token: Secret<String>,
         timeout: std::time::Duration,
     ) -> EmailClient {
-        let http_client = Client::builder()
-            .timeout(timeout)
-            .build()
-            .unwrap();
+        let http_client = Client::builder().timeout(timeout).build().unwrap();
         Self {
             http_client,
             base_url,
@@ -36,19 +45,30 @@ impl EmailClient {
         text_content: &str,
     ) -> Result<(), reqwest::Error> {
         let url = format!("{}/email/send", self.base_url);
-        let uri = reqwest::Url::parse_with_params(
-            &url,
-            [
-                ("apikey", self.authorization_token.expose_secret()),
-                ("subject", &subject.to_owned()),
-                ("from", &self.sender.as_ref().to_owned()),
-                ("to", &recipient.as_ref().to_owned()),
-                ("bodyHtml", &html_content.to_owned()),
-                ("bodyText", &text_content.to_owned()),
-            ],
-        )
-        .expect("Error parsing params");
-        self.http_client.get(uri)
+        // let uri = reqwest::Url::parse
+        // let uri = reqwest::Url::parse_with_params(
+        //     &url,
+        //     [
+        //         ("apikey", self.authorization_token.expose_secret()),
+        //         ("subject", &subject.to_owned()),
+        //         ("from", &self.sender.as_ref().to_owned()),
+        //         ("to", &recipient.as_ref().to_owned()),
+        //         ("bodyHtml", &html_content.to_owned()),
+        //         ("bodyText", &text_content.to_owned()),
+        //     ],
+        // )
+        // .expect("Error parsing params");
+        let query = ElasticEmailParameters {
+            apikey: self.authorization_token.expose_secret(),
+            subject,
+            from: self.sender.as_ref(),
+            to: recipient.as_ref(),
+            body_html: html_content,
+            body_text: text_content,
+        };
+        self.http_client
+            .get(url)
+            .query(&query)
             .send()
             .await?
             .error_for_status()?;
@@ -98,9 +118,9 @@ struct SendEmailRequest<'a> {
 
 #[cfg(test)]
 mod test {
-    use claim::{assert_err, assert_ok};
     use crate::domain::SubscriberEmail;
     use crate::email_client::EmailClient;
+    use claim::{assert_err, assert_ok};
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
@@ -122,10 +142,10 @@ mod test {
 
     fn email_client(base_url: String) -> EmailClient {
         EmailClient::new(
-            base_url, 
-            email(), 
+            base_url,
+            email(),
             Secret::new(Faker.fake()),
-            std::time::Duration::from_millis(200)
+            std::time::Duration::from_millis(200),
         )
     }
 
@@ -134,8 +154,7 @@ mod test {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
-        let response = ResponseTemplate::new(200)
-            .set_delay(std::time::Duration::from_secs(180));
+        let response = ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(180));
 
         Mock::given(any())
             .respond_with(response)
@@ -162,9 +181,8 @@ mod test {
             .await;
 
         let outcome = email_client
-            .send_email_elastic_mail(
-                email(), &subject(), &content(), &content()
-            ).await;
+            .send_email_elastic_mail(email(), &subject(), &content(), &content())
+            .await;
 
         assert_err!(outcome);
     }
@@ -199,9 +217,8 @@ mod test {
             .await;
 
         let outcome = email_client
-            .send_email_elastic_mail(
-                email(), &subject(), &content(), &content()
-            ).await;
+            .send_email_elastic_mail(email(), &subject(), &content(), &content())
+            .await;
 
         assert_ok!(outcome);
     }
@@ -252,7 +269,7 @@ mod test {
             mock_server.uri(),
             sender.clone(),
             Secret::new(apikey.to_owned()),
-            std::time::Duration::from_millis(200)
+            std::time::Duration::from_millis(200),
         );
 
         let subscriber_email = email();

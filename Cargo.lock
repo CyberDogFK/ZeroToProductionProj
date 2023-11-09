@@ -1079,7 +1079,7 @@ dependencies = [
  "rand 0.7.3",
  "serde 1.0.190",
  "serde_json",
- "serde_qs",
+ "serde_qs 0.8.5",
  "serde_urlencoded",
  "url",
 ]
@@ -1308,6 +1308,15 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linkify"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28d9967eb7d0bc31c39c6f52e8fce42991c0cd1f7a2078326f0b7a399a584c8d"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "linux-raw-sys"
@@ -2064,6 +2073,17 @@ name = "serde_qs"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7715380eec75f029a4ef7de39a9200e0a63823176b759d055b613f5a87df6a6"
+dependencies = [
+ "percent-encoding",
+ "serde 1.0.190",
+ "thiserror",
+]
+
+[[package]]
+name = "serde_qs"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0431a35568651e363364210c91983c1da5eb29404d9f0928b67d4ebcfa7d330c"
 dependencies = [
  "percent-encoding",
  "serde 1.0.190",
@@ -3141,14 +3161,17 @@ dependencies = [
  "claim",
  "config",
  "fake",
+ "linkify",
  "once_cell",
  "quickcheck",
  "quickcheck_macros",
+ "rand 0.8.5",
  "reqwest",
  "secrecy",
  "serde 1.0.190",
  "serde-aux",
  "serde_json",
+ "serde_qs 0.12.0",
  "sqlx",
  "tokio",
  "tracing",
