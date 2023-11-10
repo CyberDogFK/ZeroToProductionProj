@@ -47,10 +47,19 @@ pub async fn subscribe(
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
 
-    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
+    let existing_subscriber = find_subscriber(&mut transaction, &new_subscriber).await;
+
+    let subscriber_id = match existing_subscriber {
         Err(_) => return HttpResponse::InternalServerError().finish(),
+        Ok(result) => match result {
+            Some(existing_subscriber_id) => existing_subscriber_id,
+            None => match insert_subscriber(&mut transaction, &new_subscriber).await {
+                Ok(subscriber_id) => subscriber_id,
+                Err(_) => return HttpResponse::InternalServerError().finish(),
+            },
+        },
     };
+
     let subscription_token = generate_subscription_token();
     if store_token(&mut transaction, subscriber_id, &subscription_token)
         .await
@@ -88,7 +97,10 @@ pub async fn store_token(
     sqlx::query!(
         r#"
         INSERT INTO subscription_tokens (subscription_token, subscriber_id)
-        VALUES ($1, $2)"#,
+        VALUES ($1, $2)
+        ON CONFLICT (subscriber_id) DO UPDATE
+            SET subscription_token = EXCLUDED.subscription_token
+        "#,
         subscription_token,
         subscriber_id
     )
@@ -156,6 +168,32 @@ pub async fn insert_subscriber(
         e
     })?;
     Ok(subscriber_id)
+}
+
+#[tracing::instrument(
+    name = "Finding existing subscriber in the database",
+    skip(transaction, new_subscriber)
+)]
+pub async fn find_subscriber(
+    transaction: &mut Transaction<'_, Postgres>,
+    new_subscriber: &NewSubscriber,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        SELECT id FROM subscriptions WHERE email = $1
+        "#,
+        new_subscriber.email.as_ref()
+    )
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?
+    // .map(|r| SubscriberEmail::parse(r.email).expect("Wrong saved email format!"));
+    .map(|r| r.id);
+
+    Ok(result)
 }
 
 fn generate_subscription_token() -> String {
