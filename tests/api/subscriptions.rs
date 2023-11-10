@@ -21,15 +21,14 @@ async fn user_tries_subscribe_twice_when_he_is_not_confirmed_and_get_two_confirm
     let saved_id = sqlx::query!("SELECT id FROM subscriptions")
         .fetch_one(&app.db_pool)
         .await
-        .unwrap().id;
-    let first_token =
-        get_subscription_token_for_subscriber_id(&app.db_pool, saved_id).await;
+        .unwrap()
+        .id;
+    let first_token = get_subscription_token_for_subscriber_id(&app.db_pool, saved_id).await;
 
     assert_eq!(first_response.status().as_u16(), 200);
 
     let second_response = app.post_subscriptions(body.into()).await;
-    let second_token =
-        get_subscription_token_for_subscriber_id(&app.db_pool, saved_id).await;
+    let second_token = get_subscription_token_for_subscriber_id(&app.db_pool, saved_id).await;
 
     assert_eq!(second_response.status().as_u16(), 200);
 
@@ -47,12 +46,12 @@ async fn user_tries_subscribe_twice_when_he_is_not_confirmed_and_get_two_confirm
         .unwrap();
 
     assert_eq!(all_saved.len(), 1, "You must not saved again same user");
-    assert_ne!(first_token, second_token, "With every request saved token must change");
-    println!("first_token {} \n second_token {}", first_token, second_token);
-    println!("first confirmation link {},\n second confirmation link {}", first_confirmation_links.html, second_confirmation_links.html);
     assert_ne!(
-        first_confirmation_links.html,
-        second_confirmation_links.html,
+        first_token, second_token,
+        "With every request saved token must change"
+    );
+    assert_ne!(
+        first_confirmation_links.html, second_confirmation_links.html,
         "Send different links with different token"
     )
 }

@@ -1,6 +1,40 @@
 use crate::helpers::spawn_app;
+use reqwest::StatusCode;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
+
+#[tokio::test]
+async fn clicking_on_the_confirmation_link_twice_reject_with_code_400() {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email/send"))
+        .and(method("GET"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    app.post_subscriptions(body.into()).await;
+
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let confirmation_links = app.get_confirmation_links(email_request);
+
+    reqwest::get(confirmation_links.html.clone())
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    let second_response = reqwest::get(confirmation_links.html)
+        .await
+        .unwrap()
+        .status();
+    assert_eq!(
+        second_response,
+        StatusCode::BAD_REQUEST,
+        "On second request you must return status code 400"
+    )
+}
 
 #[tokio::test]
 async fn clicking_on_the_confirmation_link_confirms_a_subscriber() {
@@ -15,7 +49,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() {
 
     app.post_subscriptions(body.into()).await;
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
-    let confirmation_links = app.get_confirmation_links(&email_request);
+    let confirmation_links = app.get_confirmation_links(email_request);
 
     reqwest::get(confirmation_links.html)
         .await
