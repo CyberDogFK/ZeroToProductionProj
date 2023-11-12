@@ -35,6 +35,10 @@ serde_qs = "0.12.0"
 rand = { version = "0.8", features = ["std_rng"] }
 thiserror = "1"
 anyhow = "1"
+base64 = "0.13"
+sha3 = "0.9"
+argon2 = { version = "0.5.2" , features = ["std"]}
+
 
 [dependencies.sqlx]
 version = "0.7.2"
