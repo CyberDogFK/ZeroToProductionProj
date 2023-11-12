@@ -39,7 +39,7 @@ impl EmailClient {
 
     pub async fn send_email_elastic_mail(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,
@@ -170,7 +170,7 @@ mod test {
             .await;
 
         let outcome = email_client
-            .send_email_elastic_mail(email(), &subject(), &content(), &content())
+            .send_email_elastic_mail(&email(), &subject(), &content(), &content())
             .await;
 
         assert_err!(outcome);
@@ -195,7 +195,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn send_email_succeds_if_the_server_returns_200_elastic_email() {
+    async fn send_email_succeed_if_the_server_returns_200_elastic_email() {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
@@ -206,7 +206,7 @@ mod test {
             .await;
 
         let outcome = email_client
-            .send_email_elastic_mail(email(), &subject(), &content(), &content())
+            .send_email_elastic_mail(&email(), &subject(), &content(), &content())
             .await;
 
         assert_ok!(outcome);
@@ -278,7 +278,7 @@ mod test {
             .await;
 
         let _ = email_client
-            .send_email_elastic_mail(subscriber_email, &subject, &content, &content)
+            .send_email_elastic_mail(&subscriber_email, &subject, &content, &content)
             .await;
     }
 
