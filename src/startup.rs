@@ -25,7 +25,9 @@ impl Application {
         let timeout = configuration.email_client.timeout();
         let email_client = EmailClient::new(
             configuration.email_client.base_url,
+            // "https://api.elasticemail.com".into(),
             sender_email,
+            // SubscriberEmail::parse("streetreadger@gmail.com".into()).unwrap(),
             configuration.email_client.authorization_token,
             timeout,
         );

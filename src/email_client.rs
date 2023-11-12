@@ -45,19 +45,6 @@ impl EmailClient {
         text_content: &str,
     ) -> Result<(), reqwest::Error> {
         let url = format!("{}/email/send", self.base_url);
-        // let uri = reqwest::Url::parse
-        // let uri = reqwest::Url::parse_with_params(
-        //     &url,
-        //     [
-        //         ("apikey", self.authorization_token.expose_secret()),
-        //         ("subject", &subject.to_owned()),
-        //         ("from", &self.sender.as_ref().to_owned()),
-        //         ("to", &recipient.as_ref().to_owned()),
-        //         ("bodyHtml", &html_content.to_owned()),
-        //         ("bodyText", &text_content.to_owned()),
-        //     ],
-        // )
-        // .expect("Error parsing params");
         let query = ElasticEmailParameters {
             apikey: self.authorization_token.expose_secret(),
             subject,
@@ -66,12 +53,14 @@ impl EmailClient {
             body_html: html_content,
             body_text: text_content,
         };
-        self.http_client
+        let response = self
+            .http_client
             .get(url)
             .query(&query)
             .send()
             .await?
             .error_for_status()?;
+        tracing::info!("Response {:?}", response);
         Ok(())
     }
 
