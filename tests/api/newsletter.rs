@@ -1,7 +1,7 @@
 use crate::helpers::{spawn_app, ConfirmationLinks, TestApp};
+use uuid::Uuid;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
-use uuid::Uuid;
 
 #[tokio::test]
 async fn invalid_password_is_rejected() {
@@ -29,7 +29,6 @@ async fn invalid_password_is_rejected() {
         r#"Basic realm="publish""#,
         response.headers()["WWW-Authenticate"]
     )
-
 }
 
 #[tokio::test]
@@ -54,8 +53,10 @@ async fn non_existing_user_is_rejected() {
         .expect("Failed to execute request.");
 
     assert_eq!(401, response.status().as_u16());
-    assert_eq!(r#"Basic realm="publish""#,
-    response.headers()["WWW-Authenticate"])
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response.headers()["WWW-Authenticate"]
+    )
 }
 
 #[tokio::test]

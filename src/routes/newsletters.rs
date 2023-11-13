@@ -68,7 +68,7 @@ async fn validate_credentials(
         "$argon2id$v=19$m=15000,t=2,p=1$\
          gZiV/M1gPc22ElAH/Jh1Hw$\
           CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno"
-            .to_string()
+            .to_string(),
     );
 
     if let Some((stored_user_id, stored_password_hash)) =
@@ -87,9 +87,7 @@ async fn validate_credentials(
     .context("Failed to spawn blocking task.")
     .map_err(PublishError::UnexpectedError)??;
 
-    user_id.ok_or_else(||
-        PublishError::AuthError(anyhow::anyhow!("Unknown username."))
-    )
+    user_id.ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))
 }
 
 #[tracing::instrument(
