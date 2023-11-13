@@ -1,5 +1,5 @@
 use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
-    test_user: TestUser,
+    pub test_user: TestUser,
 }
 
 pub struct ConfirmationLinks {
@@ -65,13 +65,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn test_user(&self) -> (String, String) {
-        let row = sqlx::query!("SELECT username, password_hash FROM users LIMIT 1",)
-            .fetch_one(&self.db_pool)
-            .await
-            .expect("Failed to create test users.");
-        (row.username, row.password_hash)
-    }
+    // pub async fn test_user(&self) -> (String, String) {
+    //     let row = sqlx::query!("SELECT username, password_hash FROM users LIMIT 1",)
+    //         .fetch_one(&self.db_pool)
+    //         .await
+    //         .expect("Failed to create test users.");
+    //     (row.username, row.password_hash)
+    // }
 }
 
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -137,7 +137,12 @@ impl TestUser {
 
     async fn store(&self, pool: &PgPool) {
         let salt = SaltString::generate(&mut rand::thread_rng());
-        let password_hash = Argon2::default()
+
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap()
+        )
             .hash_password(self.password.as_bytes(), &salt)
             .unwrap()
             .to_string();
