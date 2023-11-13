@@ -1,9 +1,8 @@
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use once_cell::sync::Lazy;
-use sha3::Digest;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::collections::HashMap;
-use argon2::{Argon2, PasswordHasher};
-use argon2::password_hash::SaltString;
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::{get_configurations, DatabaseSettings};

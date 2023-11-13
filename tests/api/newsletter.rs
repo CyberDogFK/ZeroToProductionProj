@@ -24,6 +24,7 @@ async fn newsletters_are_now_delivered_to_unconfirmed_subscribers() {
 
     assert_eq!(response.status().as_u16(), 200)
 }
+// cargo test --quiet --release newsletters_are_delivered_to_confirmed_subscribers | grep "VERIFY PASSWORD" | bunyan
 
 #[tokio::test]
 async fn newsletters_are_delivered_to_confirmed_subscribers() {
