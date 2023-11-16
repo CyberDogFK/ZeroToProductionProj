@@ -28,7 +28,7 @@ pub async fn login_form(
                 );
                 "".into()
             }
-        }
+        },
     };
     HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -69,9 +69,8 @@ impl QueryParams {
         let tag = hex::decode(self.tag)?;
         let query_string = format!("error={}", urlencoding::Encoded::new(&self.error));
 
-        let mut mac = Hmac::<sha2::Sha256>::new_from_slice(
-            secret.0.expose_secret().as_bytes()
-        ).unwrap();
+        let mut mac =
+            Hmac::<sha2::Sha256>::new_from_slice(secret.0.expose_secret().as_bytes()).unwrap();
         mac.update(query_string.as_bytes());
         mac.verify_slice(&tag)?;
 
