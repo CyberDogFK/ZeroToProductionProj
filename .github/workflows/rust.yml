@@ -10,7 +10,7 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
     branches:
-      - maaster
+      - master
 
 env:
   CARGO_TERM_COLOR: always
