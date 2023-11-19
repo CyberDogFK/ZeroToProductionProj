@@ -30,7 +30,6 @@ serde-aux = "3"
 unicode-segmentation = "1"
 claim = "0.5"
 validator = "0.14"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 serde_qs = "0.12.0"
 rand = { version = "0.8", features = ["std_rng"] }
 thiserror = "1"
@@ -42,7 +41,17 @@ htmlescape = "0.3"
 hmac = { version = "0.12", features = ["std"] }
 sha2 = "0.10"
 hex = "0.4"
+actix-web-flash-messages = { version = "0.3", features = ["cookies"] }
 
+[dependencies.actix-session]
+git = "https://github.com/actix/actix-extras"
+branch = "master"
+features = ["redis-rs-tls-session"]
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["json", "rustls-tls", "cookies"]
 
 [dependencies.sqlx]
 version = "0.7.2"

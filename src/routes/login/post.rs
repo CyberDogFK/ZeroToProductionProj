@@ -1,11 +1,10 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
 use crate::routes::error_chain_fmt;
-use crate::startup::HmacSecret;
 use actix_web::error::InternalError;
 use actix_web::http::header::LOCATION;
 use actix_web::{web, HttpResponse};
-use hmac::{Hmac, Mac};
-use secrecy::{ExposeSecret, Secret};
+use actix_web_flash_messages::FlashMessage;
+use secrecy::Secret;
 use sqlx::PgPool;
 
 #[derive(serde::Deserialize)]
@@ -15,13 +14,12 @@ pub struct FormData {
 }
 
 #[tracing::instrument(
-    skip(form, pool, secret),
-    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+skip(form, pool),
+fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
 )]
 pub async fn login(
     form: web::Form<FormData>,
     pool: web::Data<PgPool>,
-    secret: web::Data<HmacSecret>,
 ) -> Result<HttpResponse, InternalError<LoginError>> {
     let credentials = Credentials {
         username: form.0.username,
@@ -40,19 +38,9 @@ pub async fn login(
                 AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
             };
-            let query_string = format!("error={}", urlencoding::Encoded::new(e.to_string()));
-            let hmac_tag = {
-                let mut mac =
-                    Hmac::<sha2::Sha256>::new_from_slice(secret.0.expose_secret().as_bytes())
-                        .unwrap();
-                mac.update(query_string.as_bytes());
-                mac.finalize().into_bytes()
-            };
+            FlashMessage::error(e.to_string()).send();
             let response = HttpResponse::SeeOther()
-                .insert_header((
-                    LOCATION,
-                    format!("/login?{}&tag={:x}", query_string, hmac_tag),
-                ))
+                .insert_header((LOCATION, "/login"))
                 .finish();
             Err(InternalError::from_response(e, response))
         }
