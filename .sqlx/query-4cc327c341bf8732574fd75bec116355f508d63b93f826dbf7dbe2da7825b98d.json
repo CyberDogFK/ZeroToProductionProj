@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id FROM subscriptions WHERE email = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4cc327c341bf8732574fd75bec116355f508d63b93f826dbf7dbe2da7825b98d"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status FROM subscriptions WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d819c5051d7a642e7910f0d8463ab434b5b4973066de0405add01517c4d1bb59"
+}
