@@ -6,16 +6,16 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 fn e500<T>(e: T) -> actix_web::Error
-    where
-        T: std::fmt::Debug + std::fmt::Display + 'static,
+where
+    T: std::fmt::Debug + std::fmt::Display + 'static,
 {
     actix_web::error::ErrorInternalServerError(e)
 }
 
-// #[tracing::instrument(
-// skip(session, pool),
-// fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
-// )]
+#[tracing::instrument(
+    skip(session, pool),
+    fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
+)]
 pub async fn admin_dashboard(
     session: TypedSession,
     pool: web::Data<PgPool>,
@@ -53,8 +53,8 @@ async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Er
         "#,
         user_id,
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to perform a query to retrieve a username.")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to perform a query to retrieve a username.")?;
     Ok(row.username)
 }
