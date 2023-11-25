@@ -7,3 +7,5 @@ mod subscriptions_confirm;
 mod admin_dashboard;
 
 mod login;
+
+mod change_password;
