@@ -18,12 +18,16 @@ pub async fn change_password(
     if session.get_user_id().map_err(e500)?.is_none() {
         return Ok(see_other("/login"));
     };
+    if form.new_password.expose_secret().len() <= 12 {
+        FlashMessage::error("Password must be longer than 12 symbols").send();
+        return Ok(see_other("/admin/password"));
+    }
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
         FlashMessage::error(
             "You entered two different new passwords - the field values must match.",
         )
         .send();
-        return Ok(see_other("/admin/password"))
+        return Ok(see_other("/admin/password"));
     }
     todo!()
 }

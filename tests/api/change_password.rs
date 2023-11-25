@@ -1,5 +1,34 @@
 use crate::helpers::{assert_is_redirect_to, spawn_app};
+use fake::Fake;
 use uuid::Uuid;
+
+#[tokio::test]
+async fn new_password_is_too_short() {
+    let app = spawn_app().await;
+    let new_password: String = (12..=12).fake();
+
+    app.post_login(&serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password
+    }))
+    .await;
+
+    let response = app
+        .post_change_password(&serde_json::json!({
+            "current_password": &app.test_user.password,
+            "new_password": &new_password,
+            "new_password_check": &new_password
+        }))
+        .await;
+
+    assert_is_redirect_to(&response, "/admin/password");
+
+    let html_page = app.get_change_password_html().await;
+    assert!(html_page.contains(
+        "<p><i>Password must be longer than 12 symbols\
+        </i></p>"
+    ))
+}
 
 #[tokio::test]
 async fn new_password_fields_must_match() {

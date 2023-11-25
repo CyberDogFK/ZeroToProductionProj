@@ -7,7 +7,7 @@ use std::fmt::Write;
 
 pub async fn change_password_form(
     session: TypedSession,
-    flash_message: IncomingFlashMessages
+    flash_message: IncomingFlashMessages,
 ) -> Result<HttpResponse, actix_web::Error> {
     if session.get_user_id().map_err(e500)?.is_none() {
         return Ok(see_other("/login"));
@@ -20,7 +20,7 @@ pub async fn change_password_form(
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(format!(
-        r#"<!DOCTYPE html>
+            r#"<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta http-equiv="content-type" content="text/html; charset=utf-8">
@@ -59,5 +59,5 @@ pub async fn change_password_form(
         </body>
         </html>
         "#,
-    )))
+        )))
 }
