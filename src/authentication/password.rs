@@ -36,9 +36,9 @@ pub async fn change_password(
         password_hash.expose_secret(),
         user_id
     )
-    .execute(pool)
-    .await
-    .context("Failed to change user's password in the database.")?;
+        .execute(pool)
+        .await
+        .context("Failed to change user's password in the database.")?;
     Ok(())
 }
 
@@ -65,8 +65,8 @@ pub async fn validate_credentials(
     spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, credentials.password)
     })
-    .await
-    .context("Failed to spawn blocking task.")??;
+        .await
+        .context("Failed to spawn blocking task.")??;
 
     user_id
         .ok_or_else(|| anyhow::anyhow!("Unknown username."))
@@ -74,8 +74,8 @@ pub async fn validate_credentials(
 }
 
 #[tracing::instrument(
-    name = "Verify password hash",
-    skip(expected_password_hash, password_candidate)
+name = "Verify password hash",
+skip(expected_password_hash, password_candidate)
 )]
 fn verify_password_hash(
     expected_password_hash: Secret<String>,
@@ -106,10 +106,10 @@ async fn get_stored_credentials(
         "#,
         username
     )
-    .fetch_optional(pool)
-    .await
-    .context("Failed to perform a query to retrieve stored credentials.")?
-    .map(|row| (row.user_id, Secret::new(row.password_hash)));
+        .fetch_optional(pool)
+        .await
+        .context("Failed to perform a query to retrieve stored credentials.")?
+        .map(|row| (row.user_id, Secret::new(row.password_hash)));
     Ok(row)
 }
 
@@ -120,7 +120,7 @@ fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, any
         Version::V0x13,
         Params::new(15000, 2, 1, None).unwrap(),
     )
-    .hash_password(password.expose_secret().as_bytes(), &salt)?
-    .to_string();
+        .hash_password(password.expose_secret().as_bytes(), &salt)?
+        .to_string();
     Ok(Secret::new(password_hash))
 }
