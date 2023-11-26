@@ -4,8 +4,8 @@ mod login;
 mod newsletters;
 mod subscriptions;
 mod subscriptions_confirm;
-
 mod admin;
+mod logout;
 
 pub use admin::*;
 pub use health_check::*;
@@ -14,3 +14,4 @@ pub use login::*;
 pub use newsletters::*;
 pub use subscriptions::*;
 pub use subscriptions_confirm::*;
+pub use logout::log_out;
