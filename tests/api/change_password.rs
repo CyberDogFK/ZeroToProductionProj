@@ -7,7 +7,7 @@ async fn changing_password_works() {
     let app = spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
-   let login_body = serde_json::json!({
+    let login_body = serde_json::json!({
         "username": &app.test_user.username,
         "password": &app.test_user.password
     });
