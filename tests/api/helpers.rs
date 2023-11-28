@@ -1,6 +1,7 @@
 use argon2::password_hash::SaltString;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use once_cell::sync::Lazy;
+use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -24,6 +25,13 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
+    pub fn get_json_with_app_test_user(&self) -> Value {
+        serde_json::json!({
+            "username": self.test_user.username,
+            "password": self.test_user.password
+        })
+    }
+
     pub async fn post_logout(&self) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/admin/logout", &self.address))
@@ -126,7 +134,6 @@ impl TestApp {
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await

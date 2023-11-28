@@ -1,7 +1,6 @@
 use crate::authentication::{validate_credentials, Credentials};
-use crate::session_state::TypedSession;
+use crate::session_state::{reject_anonymous_users, TypedSession};
 use crate::utils::{e500, see_other};
-use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
 use secrecy::{ExposeSecret, Secret};
@@ -15,6 +14,7 @@ pub struct FormData {
     new_password_check: Secret<String>,
 }
 
+#[tracing::instrument(name = "Changing password", skip(form, session, pool))]
 pub async fn change_password(
     form: web::Form<FormData>,
     session: TypedSession,
@@ -58,7 +58,7 @@ async fn validate_current_password(
     current_password: Secret<String>,
     pg_pool: &PgPool,
 ) -> Result<(), anyhow::Error> {
-    let username = match get_user_name_by_id(user_id, pg_pool).await? {
+    let username = match get_username_by_id(user_id, pg_pool).await? {
         None => Err(anyhow::anyhow!("User without username!"))?,
         Some(username) => username,
     };
@@ -74,7 +74,7 @@ async fn validate_current_password(
     Ok(())
 }
 
-async fn get_user_name_by_id(
+pub async fn get_username_by_id(
     user_id: &Uuid,
     pool: &PgPool,
 ) -> Result<Option<String>, anyhow::Error> {
@@ -90,15 +90,4 @@ async fn get_user_name_by_id(
     .await?
     .map(|r| r.username);
     Ok(username)
-}
-
-async fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, actix_web::Error> {
-    match session.get_user_id().map_err(e500)? {
-        Some(user_id) => Ok(user_id),
-        None => {
-            let response = see_other("/login");
-            let e = anyhow::anyhow!("The user has not logged in");
-            Err(InternalError::from_response(e, response).into())
-        }
-    }
 }

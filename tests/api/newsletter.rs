@@ -1,62 +1,23 @@
-use crate::helpers::{spawn_app, ConfirmationLinks, TestApp};
-use uuid::Uuid;
+use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, TestApp};
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn invalid_password_is_rejected() {
+async fn accept_users_by_session_based_authentication() {
     let app = spawn_app().await;
-    let username = &app.test_user.username;
-    let password = Uuid::new_v4().to_string();
-    assert_ne!(app.test_user.password, password);
 
-    let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
-        .basic_auth(username, Some(password))
-        .json(&serde_json::json!({
+    app.post_login(&app.get_json_with_app_test_user()).await;
+
+    let response = app
+        .post_newsletters(serde_json::json!({
             "title": "Newsletter title",
             "content": {
                 "text": "Newsletter body as plain text",
                 "html": "<p>Newsletter body as HTML</p>"
             }
         }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    )
-}
-
-#[tokio::test]
-async fn non_existing_user_is_rejected() {
-    let app = spawn_app().await;
-
-    let username = Uuid::new_v4().to_string();
-    let password = Uuid::new_v4().to_string();
-
-    let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
-        .basic_auth(username, Some(password))
-        .json(&serde_json::json!({
-            "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body aas plain text",
-                "html": "<p>Newsletter body as HTML</p>",
-            }
-        }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    )
+        .await;
+    assert_eq!(200, response.status().as_u16())
 }
 
 #[tokio::test]
@@ -77,6 +38,7 @@ async fn newsletters_are_now_delivered_to_unconfirmed_subscribers() {
             "html": "<p>Newsletter body as HTML</p>",
         }
     });
+    app.post_login(&app.get_json_with_app_test_user()).await;
     let response = app.post_newsletters(newsletter_request_body).await;
 
     assert_eq!(response.status().as_u16(), 200)
@@ -101,6 +63,7 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
             "html": "<p>Newsletter body as HTML</p>",
         }
     });
+    app.post_login(&app.get_json_with_app_test_user()).await;
     let response = app.post_newsletters(newsletter_request_body).await;
 
     assert_eq!(response.status().as_u16(), 200);
@@ -125,6 +88,7 @@ async fn newsletters_returns_400_for_invalid_data() {
         ),
     ];
 
+    app.post_login(&app.get_json_with_app_test_user()).await;
     for (invalid_body, error_message) in test_cases {
         let response = app.post_newsletters(invalid_body).await;
 
@@ -141,24 +105,17 @@ async fn newsletters_returns_400_for_invalid_data() {
 async fn request_missing_authorization_are_rejected() {
     let app = spawn_app().await;
 
-    let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
-        .json(&serde_json::json!({
+    let response = app
+        .post_newsletters(serde_json::json!({
             "title": "Newsletter title",
             "content": {
                 "text": "Newsletter body as plain text",
                 "html": "<p>Newsletter body as HTML</p>",
             }
         }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
+        .await;
 
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    );
+    assert_is_redirect_to(&response, "/login")
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {

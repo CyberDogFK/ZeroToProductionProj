@@ -1,41 +1,33 @@
-use crate::authentication::{validate_credentials, AuthError, Credentials};
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::routes::error_chain_fmt;
+use crate::session_state::{reject_anonymous_users, TypedSession};
+use crate::utils::e500;
 use actix_web::body::BoxBody;
-use actix_web::http::header::{HeaderMap, HeaderValue};
+use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpRequest};
+use actix_web::web;
 use actix_web::{HttpResponse, ResponseError};
 use anyhow::Context;
 use reqwest::header;
-use secrecy::Secret;
 use sqlx::PgPool;
 use std::fmt::Formatter;
 use tokio::task::JoinHandle;
 
 #[tracing::instrument(
 name = "Publish a newsletter issue",
-skip(body, pool, email_client, request),
+skip(body, pool, email_client, session),
 fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
     body: web::Json<BodyData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
-    request: HttpRequest,
-) -> Result<HttpResponse, PublishError> {
-    let credentials = basic_authentication(request.headers()).map_err(PublishError::AuthError)?;
-    tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &pool)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
-        })?;
-    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+    session: TypedSession,
+) -> Result<HttpResponse, actix_web::Error> {
+    reject_anonymous_users(session).await?;
 
-    let subscribers = get_confirmed_subscriber(&pool).await?;
+    let subscribers = get_confirmed_subscriber(&pool).await.map_err(e500)?;
     for subscriber in subscribers {
         match subscriber {
             Ok(subscriber) => {
@@ -49,7 +41,8 @@ pub async fn publish_newsletter(
                     .await
                     .with_context(|| {
                         format!("Failed to send newsletter issue to {}", subscriber.email)
-                    })?;
+                    })
+                    .map_err(e500)?;
             }
             Err(error) => {
                 tracing::warn!(
@@ -61,36 +54,6 @@ pub async fn publish_newsletter(
         }
     }
     Ok(HttpResponse::Ok().finish())
-}
-
-fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
-    let header_value = headers
-        .get("Authorization")
-        .context("The 'Authorization' header was missing")?
-        .to_str()
-        .context("The 'Authorization' header was not a valid UTF8 string.")?;
-    let base64encoded_segment = header_value
-        .strip_prefix("Basic ")
-        .context("The authorization scheme was not 'Basic'.")?;
-    let decode_bytes = base64::decode_config(base64encoded_segment, base64::STANDARD)
-        .context("Failed to base64-decode 'Basic' credentials.")?;
-    let decode_credentials = String::from_utf8(decode_bytes)
-        .context("The decoded credential string is not valid UTF8.")?;
-
-    let mut credentials = decode_credentials.splitn(2, ':');
-    let username = credentials
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("A username must be provided in 'Basic' auth."))?
-        .to_string();
-    let password = credentials
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("A password must be provided in 'Basic' auth."))?
-        .to_string();
-
-    Ok(Credentials {
-        username,
-        password: Secret::new(password),
-    })
 }
 
 #[derive(serde::Deserialize)]
