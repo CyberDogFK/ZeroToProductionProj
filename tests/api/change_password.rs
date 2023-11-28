@@ -1,16 +1,38 @@
-use crate::helpers::{assert_is_redirect_to, spawn_app};
+use crate::helpers::{assert_is_redirect_to, spawn_app, TestApp};
 use fake::Fake;
+use serde_json::Value;
+use tracing::log::__private_api::log;
 use uuid::Uuid;
+
+#[tokio::test]
+async fn invalid_current_password_must_be_rejected() {
+    let app = spawn_app().await;
+
+    let login_body = get_json_with_app_test_user(&app);
+
+    app.post_login(&login_body).await;
+
+    let new_password = Uuid::new_v4().to_string();
+
+    let response = app
+        .post_change_password(&serde_json::json!({
+            "current_password": Uuid::new_v4().to_string(),
+            "new_password": &new_password,
+            "new_password_check": &new_password,
+        }))
+        .await;
+    assert_is_redirect_to(&response, "/admin/password");
+    let response = app.get_change_password_html().await;
+    assert!(response.contains("<p><i>Wrong current password!</i></p>"))
+}
 
 #[tokio::test]
 async fn changing_password_works() {
     let app = spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
-    let login_body = serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    });
+    let login_body = get_json_with_app_test_user(&app);
+
     let response = app.post_login(&login_body).await;
     assert_is_redirect_to(&response, "/admin/dashboard");
 
@@ -45,11 +67,7 @@ async fn new_password_is_too_short() {
     let app = spawn_app().await;
     let new_password: String = (12..=12).fake();
 
-    app.post_login(&serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    }))
-    .await;
+    app.post_login(&get_json_with_app_test_user(&app)).await;
 
     let response = app
         .post_change_password(&serde_json::json!({
@@ -74,11 +92,7 @@ async fn new_password_fields_must_match() {
     let new_password = Uuid::new_v4().to_string();
     let another_new_password = Uuid::new_v4().to_string();
 
-    app.post_login(&serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    }))
-    .await;
+    app.post_login(&get_json_with_app_test_user(&app)).await;
 
     let response = app
         .post_change_password(&serde_json::json!({
@@ -120,4 +134,11 @@ async fn you_must_be_logged_in_to_change_your_password() {
         .await;
 
     assert_is_redirect_to(&response, "/login");
+}
+
+fn get_json_with_app_test_user(app: &TestApp) -> Value {
+    serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password
+    })
 }

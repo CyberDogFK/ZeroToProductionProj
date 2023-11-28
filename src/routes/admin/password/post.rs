@@ -1,3 +1,4 @@
+use crate::authentication::{validate_credentials, Credentials};
 use crate::session_state::TypedSession;
 use crate::utils::{e500, see_other};
 use actix_web::error::InternalError;
@@ -20,22 +21,75 @@ pub async fn change_password(
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id = reject_anonymous_users(session).await?;
-    if form.new_password.expose_secret().len() <= 12 {
-        FlashMessage::error("Password must be longer than 12 symbols").send();
-        return Ok(see_other("/admin/password"));
+
+    if validate_current_password(&user_id, form.0.current_password, &pool)
+        .await
+        .is_err()
+    {
+        FlashMessage::error("Wrong current password!").send();
+        return Ok(redirect_back_to_page());
     }
-    if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
+    let new_password = form.0.new_password;
+    let check_password = form.0.new_password_check;
+    if new_password.expose_secret().len() <= 12 {
+        FlashMessage::error("Password must be longer than 12 symbols").send();
+        return Ok(redirect_back_to_page());
+    }
+    if new_password.expose_secret() != check_password.expose_secret() {
         FlashMessage::error(
             "You entered two different new passwords - the field values must match.",
         )
         .send();
-        return Ok(see_other("/admin/password"));
+        return Ok(redirect_back_to_page());
     }
-    crate::authentication::change_password(user_id, form.0.new_password, &pool)
+    crate::authentication::change_password(user_id, new_password, &pool)
         .await
         .map_err(e500)?;
     FlashMessage::error("Your password has been changed.").send();
-    Ok(see_other("/admin/password"))
+    Ok(redirect_back_to_page())
+}
+
+fn redirect_back_to_page() -> HttpResponse {
+    see_other("/admin/password")
+}
+
+async fn validate_current_password(
+    user_id: &Uuid,
+    current_password: Secret<String>,
+    pg_pool: &PgPool,
+) -> Result<(), anyhow::Error> {
+    let username = match get_user_name_by_id(user_id, pg_pool).await? {
+        None => Err(anyhow::anyhow!("User without username!"))?,
+        Some(username) => username,
+    };
+
+    validate_credentials(
+        Credentials {
+            username,
+            password: current_password,
+        },
+        pg_pool,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn get_user_name_by_id(
+    user_id: &Uuid,
+    pool: &PgPool,
+) -> Result<Option<String>, anyhow::Error> {
+    let username = sqlx::query!(
+        r#"
+        SELECT username
+        FROM users
+        WHERE user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_optional(pool)
+    .await?
+    .map(|r| r.username);
+    Ok(username)
 }
 
 async fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, actix_web::Error> {
