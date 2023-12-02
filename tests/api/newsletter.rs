@@ -3,29 +3,20 @@ use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn accept_users_by_session_based_authentication() {
+async fn post_accept_users_by_session_based_authentication() {
     let app = spawn_app().await;
 
     app.post_login(&app.get_json_with_app_test_user()).await;
-    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
-    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
+    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
         .to_string();
 
-    let response = app
-        // .post_newsletters(&serde_json::json!({
-        //     "title": "Newsletter title",
-        //     "content": {
-        //         "text": "Newsletter body as plain text",
-        //         "html": "<p>Newsletter body as HTML</p>"
-        //     }
-        // }))
-        .post_newsletters(body)
-        .await;
-    assert_eq!(response.status().as_u16(), 200)
+    let response = app.post_admin_newsletters(body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
 }
 
 #[tokio::test]
-async fn newsletters_are_now_delivered_to_unconfirmed_subscribers() {
+async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     let app = spawn_app().await;
     create_unconfirmed_subscriber(&app).await;
 
@@ -35,13 +26,15 @@ async fn newsletters_are_now_delivered_to_unconfirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
-    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
+    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
         .to_string();
     app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_newsletters(body.to_string()).await;
+    let response = app.post_admin_newsletters(body.to_string()).await;
 
-    assert_eq!(response.status().as_u16(), 200)
+    assert_is_redirect_to(&response, "/admin/newsletters");
+    let response: String = app.get_admin_newsletters().await;
+    assert!(response.contains("<p><i>The newsletter issue has been published!</i></p>"))
 }
 
 #[tokio::test]
@@ -56,34 +49,34 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
-    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
+    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
         .to_string();
     app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_newsletters(body).await;
+    let response = app.post_admin_newsletters(body).await;
 
-    assert_eq!(response.status().as_u16(), 200);
+    assert_is_redirect_to(&response, "/admin/newsletters");
+    let response: String = app.get_admin_newsletters().await;
+    assert!(response.contains("<p><i>The newsletter issue has been published!</i></p>"))
 }
 
 #[tokio::test]
 async fn newsletters_returns_400_for_invalid_data() {
     let app = spawn_app().await;
-    // let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
-    // html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E".to_string();
     let test_cases: Vec<(&str, &str)> = vec![
         (
-            "text=Newsletter%20body%20as%20plain%20text&html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E",
+            "text_content=Newsletter%20body%20as%20plain%20text&html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E",
             "missing title"
         ),
         (
             "title=Newsletter%20title",
-            "missing text and html"
+            "missing text_content and html_content"
         ),
     ];
 
     app.post_login(&app.get_json_with_app_test_user()).await;
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_newsletters(invalid_body.to_string()).await;
+        let response = app.post_admin_newsletters(invalid_body.to_string()).await;
 
         assert_eq!(
             400,
@@ -98,10 +91,10 @@ async fn newsletters_returns_400_for_invalid_data() {
 async fn request_missing_authorization_are_rejected() {
     let app = spawn_app().await;
 
-    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
-    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
+    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
         .to_string();
-    let response = app.post_newsletters(body).await;
+    let response = app.post_admin_newsletters(body).await;
 
     assert_is_redirect_to(&response, "/login")
 }

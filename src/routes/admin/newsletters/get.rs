@@ -3,7 +3,7 @@ use actix_web::HttpResponse;
 use actix_web_flash_messages::IncomingFlashMessages;
 use std::fmt::Write;
 
-pub async fn change_password_form(
+pub async fn send_newsletters_form(
     flash_message: IncomingFlashMessages,
 ) -> Result<HttpResponse, actix_web::Error> {
     let mut msg_html = String::new();
@@ -13,44 +13,41 @@ pub async fn change_password_form(
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(format!(
-            r#"<!DOCTYPE html>
-        <html lang="en">
+            r#"
+        <!DOCTYPE html/>
         <head>
             <meta http-equiv="content-type" content="text/html; charset=utf-8">
-            <title>Change Password</title>
+            <title>Send newsletters</title>
         </head>
         <body>
             {msg_html}
-            <form action="/admin/password" method="post">
-                <label> Current password
+            <form action="/admin/newsletters" method="post">
+                <label>Title
                     <input
-                        type="password"
-                        placeholder="Enter current password"
-                        name="current_password"
+                        type="text"
+                        placeholder="Enter title of letter"
+                        name="title"
                     >
                 </label>
                 <br>
-                <label>New password
+                <label>Text body
                     <input
-                        type="password"
-                        placeholder="Enter new password"
-                        name="new_password"
+                        type="text"
+                        placeholder="Enter text of your letter"
+                        name="text_content"
                     >
                 </label>
                 <br>
-                <label>Confirm new password
+                <label>HTML body
                     <input
-                        type="password"
-                        placeholder="Type the new password again"
-                        name="new_password_check"
+                        type="text"
+                        placeholder="Enter html text of your letter"
+                        name="html_content"
                     >
                 </label>
-                <br>
-                <button type="submit">Change password</button>
+                <button type="submit">Send to all subscribers</button>
             </form>
-            <p><a href="/admin/dashboard">&lt;- Back</a></p>
         </body>
-        </html>
         "#,
         )))
 }

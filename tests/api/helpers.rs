@@ -131,7 +131,7 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn post_newsletters(&self, body: String) -> reqwest::Response {
+    pub async fn post_admin_newsletters(&self, body: String) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/admin/newsletters", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -139,6 +139,17 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn get_admin_newsletters(&self) -> String {
+        self.api_client
+            .get(&format!("{}/admin/newsletters", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .text()
+            .await
+            .unwrap()
     }
 }
 

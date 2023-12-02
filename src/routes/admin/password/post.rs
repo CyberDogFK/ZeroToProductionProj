@@ -1,5 +1,5 @@
 use crate::authentication::{validate_credentials, Credentials};
-use crate::session_state::{reject_anonymous_users, TypedSession};
+use crate::session_state::{get_user_id_from_session, TypedSession};
 use crate::utils::{e500, see_other};
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
@@ -20,7 +20,7 @@ pub async fn change_password(
     session: TypedSession,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_id = reject_anonymous_users(session).await?;
+    let user_id = get_user_id_from_session(session).await?;
 
     if validate_current_password(&user_id, form.0.current_password, &pool)
         .await

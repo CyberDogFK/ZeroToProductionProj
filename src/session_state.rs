@@ -38,7 +38,7 @@ impl FromRequest for TypedSession {
     }
 }
 
-pub async fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, actix_web::Error> {
+pub async fn get_user_id_from_session(session: TypedSession) -> Result<Uuid, actix_web::Error> {
     match session.get_user_id().map_err(e500)? {
         Some(user_id) => Ok(user_id),
         None => {
