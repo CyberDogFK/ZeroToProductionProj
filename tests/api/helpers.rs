@@ -131,10 +131,11 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+    pub async fn post_newsletters(&self, body: String) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/admin/newsletters", &self.address))
-            .json(&body)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
             .send()
             .await
             .expect("Failed to execute request.")

@@ -7,17 +7,21 @@ async fn accept_users_by_session_based_authentication() {
     let app = spawn_app().await;
 
     app.post_login(&app.get_json_with_app_test_user()).await;
+    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
+    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+        .to_string();
 
     let response = app
-        .post_newsletters(serde_json::json!({
-            "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-            }
-        }))
+        // .post_newsletters(&serde_json::json!({
+        //     "title": "Newsletter title",
+        //     "content": {
+        //         "text": "Newsletter body as plain text",
+        //         "html": "<p>Newsletter body as HTML</p>"
+        //     }
+        // }))
+        .post_newsletters(body)
         .await;
-    assert_eq!(200, response.status().as_u16())
+    assert_eq!(response.status().as_u16(), 200)
 }
 
 #[tokio::test]
@@ -31,15 +35,11 @@ async fn newsletters_are_now_delivered_to_unconfirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>",
-        }
-    });
+    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
+    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+        .to_string();
     app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_newsletters(newsletter_request_body).await;
+    let response = app.post_newsletters(body.to_string()).await;
 
     assert_eq!(response.status().as_u16(), 200)
 }
@@ -56,15 +56,11 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>",
-        }
-    });
+    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
+    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+        .to_string();
     app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_newsletters(newsletter_request_body).await;
+    let response = app.post_newsletters(body).await;
 
     assert_eq!(response.status().as_u16(), 200);
 }
@@ -72,25 +68,22 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
 #[tokio::test]
 async fn newsletters_returns_400_for_invalid_data() {
     let app = spawn_app().await;
-    let test_cases = vec![
+    // let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
+    // html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E".to_string();
+    let test_cases: Vec<(&str, &str)> = vec![
         (
-            serde_json::json!({
-                "content": {
-                    "text": "Newsletter body as plain text",
-                    "html": "<p>Newsletter body as HTML</p>",
-                }
-            }),
-            "missing title",
+            "text=Newsletter%20body%20as%20plain%20text&html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E",
+            "missing title"
         ),
         (
-            serde_json::json!({"title": "Newsletter!"}),
-            "missing content",
+            "title=Newsletter%20title",
+            "missing text and html"
         ),
     ];
 
     app.post_login(&app.get_json_with_app_test_user()).await;
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_newsletters(invalid_body).await;
+        let response = app.post_newsletters(invalid_body.to_string()).await;
 
         assert_eq!(
             400,
@@ -105,15 +98,10 @@ async fn newsletters_returns_400_for_invalid_data() {
 async fn request_missing_authorization_are_rejected() {
     let app = spawn_app().await;
 
-    let response = app
-        .post_newsletters(serde_json::json!({
-            "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>",
-            }
-        }))
-        .await;
+    let body = "title=Newsletter%20title&text=Newsletter%20body%20as%20plain%20text&\
+    html=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
+        .to_string();
+    let response = app.post_newsletters(body).await;
 
     assert_is_redirect_to(&response, "/login")
 }

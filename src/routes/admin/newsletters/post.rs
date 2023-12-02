@@ -13,7 +13,7 @@ skip(body, pool, email_client, session),
 fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
-    body: web::Json<BodyData>,
+    body: web::Form<BodyData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     session: TypedSession,
@@ -25,12 +25,7 @@ pub async fn publish_newsletter(
         match subscriber {
             Ok(subscriber) => {
                 email_client
-                    .send_email_elastic_mail(
-                        &subscriber.email,
-                        &body.title,
-                        &body.content.html,
-                        &body.content.text,
-                    )
+                    .send_email_elastic_mail(&subscriber.email, &body.title, &body.html, &body.text)
                     .await
                     .with_context(|| {
                         format!("Failed to send newsletter issue to {}", subscriber.email)
@@ -52,14 +47,16 @@ pub async fn publish_newsletter(
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
-    content: Content,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Content {
+    // content: Content,
     html: String,
     text: String,
 }
+
+// #[derive(serde::Deserialize)]
+// pub struct Content {
+//     html: String,
+//     text: String,
+// }
 
 struct ConfirmedSubscriber {
     email: SubscriberEmail,
