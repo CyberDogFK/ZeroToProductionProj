@@ -1,18 +1,11 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
-use crate::routes::error_chain_fmt;
 use crate::session_state::{reject_anonymous_users, TypedSession};
 use crate::utils::e500;
-use actix_web::body::BoxBody;
-use actix_web::http::header::HeaderValue;
-use actix_web::http::StatusCode;
 use actix_web::web;
-use actix_web::{HttpResponse, ResponseError};
+use actix_web::HttpResponse;
 use anyhow::Context;
-use reqwest::header;
 use sqlx::PgPool;
-use std::fmt::Formatter;
-use tokio::task::JoinHandle;
 
 #[tracing::instrument(
 name = "Publish a newsletter issue",
@@ -96,43 +89,36 @@ async fn get_confirmed_subscriber(
     Ok(confirmed_subscribers)
 }
 
-#[derive(thiserror::Error)]
-pub enum PublishError {
-    #[error("Authentication failed.")]
-    AuthError(#[source] anyhow::Error),
-    #[error(transparent)]
-    UnexpectedError(#[from] anyhow::Error),
-}
-
-impl std::fmt::Debug for PublishError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
-    }
-}
-
-impl ResponseError for PublishError {
-    fn error_response(&self) -> HttpResponse<BoxBody> {
-        match self {
-            PublishError::UnexpectedError(_) => {
-                HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-            PublishError::AuthError(_) => {
-                let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
-                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
-                response
-                    .headers_mut()
-                    .insert(header::WWW_AUTHENTICATE, header_value);
-                response
-            }
-        }
-    }
-}
-
-pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    let current_span = tracing::Span::current();
-    tokio::task::spawn_blocking(move || current_span.in_scope(f))
-}
+// Commented to test, it it real unused in project anymore.
+// Must be removed, it that cause
+// #[derive(thiserror::Error)]
+// pub enum PublishError {
+//     #[error("Authentication failed.")]
+//     AuthError(#[source] anyhow::Error),
+//     #[error(transparent)]
+//     UnexpectedError(#[from] anyhow::Error),
+// }
+//
+// impl std::fmt::Debug for PublishError {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         error_chain_fmt(self, f)
+//     }
+// }
+//
+// impl ResponseError for PublishError {
+//     fn error_response(&self) -> HttpResponse<BoxBody> {
+//         match self {
+//             PublishError::UnexpectedError(_) => {
+//                 HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR)
+//             }
+//             PublishError::AuthError(_) => {
+//                 let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
+//                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
+//                 response
+//                     .headers_mut()
+//                     .insert(header::WWW_AUTHENTICATE, header_value);
+//                 response
+//             }
+//         }
+//     }
+// }
