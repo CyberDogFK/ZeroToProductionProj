@@ -19,7 +19,7 @@ async fn newsletter_creation_is_idempotent() {
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>",
-        "idempotence_key": uuid::Uuid::new_v4().to_string()
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_publish_newsletters(&newsletter_request_body).await;
@@ -45,6 +45,7 @@ async fn post_accept_users_by_session_based_authentication() {
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_publish_newsletters(&body).await;
@@ -66,6 +67,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
     app.test_user.login(&app).await;
     let response = app.post_publish_newsletters(&body).await;
@@ -91,6 +93,7 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     app.test_user.login(&app).await;
@@ -134,13 +137,14 @@ async fn newsletters_returns_400_for_invalid_data() {
 }
 
 #[tokio::test]
-async fn request_missing_authorization_are_rejected() {
+async fn you_must_be_logged_in_to_publish_a_newsletter() {
     let app = spawn_app().await;
 
     let body = serde_json::json!({
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_publish_newsletters(&body).await;
