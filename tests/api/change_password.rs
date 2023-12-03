@@ -6,9 +6,7 @@ use uuid::Uuid;
 async fn invalid_current_password_must_be_rejected() {
     let app = spawn_app().await;
 
-    let login_body = app.get_json_with_app_test_user();
-
-    app.post_login(&login_body).await;
+    app.test_user.login(&app).await;
 
     let new_password = Uuid::new_v4().to_string();
 
@@ -29,9 +27,7 @@ async fn changing_password_works() {
     let app = spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
-    let login_body = app.get_json_with_app_test_user();
-
-    let response = app.post_login(&login_body).await;
+    let response = app.test_user.login(&app).await;
     assert_is_redirect_to(&response, "/admin/dashboard");
 
     let response = app
@@ -65,7 +61,7 @@ async fn new_password_is_too_short() {
     let app = spawn_app().await;
     let new_password: String = (12..=12).fake();
 
-    app.post_login(&app.get_json_with_app_test_user()).await;
+    app.test_user.login(&app).await;
 
     let response = app
         .post_change_password(&serde_json::json!({
@@ -90,7 +86,7 @@ async fn new_password_fields_must_match() {
     let new_password = Uuid::new_v4().to_string();
     let another_new_password = Uuid::new_v4().to_string();
 
-    app.post_login(&app.get_json_with_app_test_user()).await;
+    app.test_user.login(&app).await;
 
     let response = app
         .post_change_password(&serde_json::json!({

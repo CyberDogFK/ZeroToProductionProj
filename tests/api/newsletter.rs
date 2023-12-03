@@ -3,15 +3,51 @@ use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
+async fn newsletter_creation_is_idempotent() {
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await;
+    app.test_user.login(&app).await;
+
+    Mock::given(path("/email/send"))
+        .and(method("GET"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotence_key": uuid::Uuid::new_v4().to_string()
+    });
+
+    let response = app.post_publish_newsletters(&newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let html_page = app.get_publish_newsletters_html().await;
+    assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
+
+    let response = app.post_publish_newsletters(&newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let html_page = app.get_publish_newsletters_html().await;
+    assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
+}
+
+#[tokio::test]
 async fn post_accept_users_by_session_based_authentication() {
     let app = spawn_app().await;
 
-    app.post_login(&app.get_json_with_app_test_user()).await;
-    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
-    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
-        .to_string();
+    app.test_user.login(&app).await;
 
-    let response = app.post_admin_newsletters(body).await;
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+    });
+
+    let response = app.post_publish_newsletters(&body).await;
     assert_is_redirect_to(&response, "/admin/newsletters");
 }
 
@@ -26,14 +62,16 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
-    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
-        .to_string();
-    app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_admin_newsletters(body.to_string()).await;
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+    });
+    app.test_user.login(&app).await;
+    let response = app.post_publish_newsletters(&body).await;
 
     assert_is_redirect_to(&response, "/admin/newsletters");
-    let response: String = app.get_admin_newsletters().await;
+    let response: String = app.get_publish_newsletters_html().await;
     assert!(response.contains("<p><i>The newsletter issue has been published!</i></p>"))
 }
 
@@ -49,34 +87,42 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
-    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
-        .to_string();
-    app.post_login(&app.get_json_with_app_test_user()).await;
-    let response = app.post_admin_newsletters(body).await;
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+    });
+
+    app.test_user.login(&app).await;
+    let response = app.post_publish_newsletters(&body).await;
 
     assert_is_redirect_to(&response, "/admin/newsletters");
-    let response: String = app.get_admin_newsletters().await;
+    let response: String = app.get_publish_newsletters_html().await;
     assert!(response.contains("<p><i>The newsletter issue has been published!</i></p>"))
 }
 
 #[tokio::test]
 async fn newsletters_returns_400_for_invalid_data() {
     let app = spawn_app().await;
-    let test_cases: Vec<(&str, &str)> = vec![
+    let test_cases = vec![
         (
-            "text_content=Newsletter%20body%20as%20plain%20text&html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E",
-            "missing title"
+            serde_json::json!({
+                "text_content": "Newsletter body as plain text",
+                "html_content": "<p>Newsletter body as HTML</p>",
+            }),
+            "missing title",
         ),
         (
-            "title=Newsletter%20title",
-            "missing text_content and html_content"
+            serde_json::json!({
+                "title": "Newsletter title",
+            }),
+            "missing text_content and html_content",
         ),
     ];
 
-    app.post_login(&app.get_json_with_app_test_user()).await;
+    app.test_user.login(&app).await;
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_admin_newsletters(invalid_body.to_string()).await;
+        let response = app.post_publish_newsletters(&invalid_body).await;
 
         assert_eq!(
             400,
@@ -91,10 +137,13 @@ async fn newsletters_returns_400_for_invalid_data() {
 async fn request_missing_authorization_are_rejected() {
     let app = spawn_app().await;
 
-    let body = "title=Newsletter%20title&text_content=Newsletter%20body%20as%20plain%20text&\
-    html_content=%3Cp%3ENewsletter%20body%20as%20HTML%3C%2Fp%3E"
-        .to_string();
-    let response = app.post_admin_newsletters(body).await;
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+    });
+
+    let response = app.post_publish_newsletters(&body).await;
 
     assert_is_redirect_to(&response, "/login")
 }
