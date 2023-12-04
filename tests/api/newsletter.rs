@@ -1,4 +1,5 @@
 use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, TestApp};
+use actix_web_flash_messages::FlashMessage;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -30,8 +31,8 @@ async fn newsletter_creation_is_idempotent() {
 
     let response = app.post_publish_newsletters(&newsletter_request_body).await;
     assert_is_redirect_to(&response, "/admin/newsletters");
-
     let html_page = app.get_publish_newsletters_html().await;
+    dbg!(&html_page);
     assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
 }
 
