@@ -44,6 +44,7 @@ hex = "0.4"
 actix-web-flash-messages = { version = "0.3", features = ["cookies"] }
 serde_json = "1"
 actix-web-lab = "0.15"
+serde_urlencoded = "0.7.1"
 
 [dependencies.actix-session]
 git = "https://github.com/actix/actix-extras"
