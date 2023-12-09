@@ -66,20 +66,20 @@ pub async fn try_execute_task(
                 .await
             {
                 tracing::error!(
-                        error.cause_chain = ?e,
-                        error.message = %e,
-                        "Failed to deliver issue to a confirmed subscriber. \
-                        Skipping.",
-                    );
+                    error.cause_chain = ?e,
+                    error.message = %e,
+                    "Failed to deliver issue to a confirmed subscriber. \
+                    Skipping.",
+                );
             }
         }
         Err(e) => {
             tracing::error!(
-                    error.cause_chain = ?e,
-                    error.message = %e,
-                    "Skipping a confirmed subscriber. \
-                    Their stored contact details are invalid.",
-                );
+                error.cause_chain = ?e,
+                error.message = %e,
+                "Skipping a confirmed subscriber. \
+                Their stored contact details are invalid.",
+            );
         }
     }
     delete_task(transaction, issue_id, &email).await?;
@@ -104,8 +104,8 @@ async fn get_issue(pool: &PgPool, issue_id: Uuid) -> Result<NewsletterIssue, any
         "#,
         issue_id
     )
-        .fetch_one(pool)
-        .await?;
+    .fetch_one(pool)
+    .await?;
     Ok(issue)
 }
 
@@ -125,8 +125,8 @@ async fn dequeue_task(
         LIMIT 1
         "#,
     )
-        .fetch_optional(transaction.deref_mut())
-        .await?;
+    .fetch_optional(transaction.deref_mut())
+    .await?;
 
     if let Some(r) = r {
         Ok(Some((
@@ -155,8 +155,8 @@ async fn delete_task(
         issue_id,
         email
     )
-        .execute(transaction.deref_mut())
-        .await?;
+    .execute(transaction.deref_mut())
+    .await?;
     transaction.commit().await?;
     Ok(())
 }
