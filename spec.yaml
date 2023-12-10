@@ -1,4 +1,6 @@
 # doctl apps create --spec spec.yaml
+# For Digital Ocean, there's no way to create redis with spec.
+#  Follow instruction on page 363
 name: zero2prod
 region: fra
 services:
@@ -17,6 +19,9 @@ services:
     routes:
       - path: /
     envs:
+      - key: APP_APPLICATION__BASE_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
       - key: APP_DATABASE__USERNAME
         scope: RUN_TIME
         value: ${newsletter.USERNAME}
@@ -38,4 +43,3 @@ databases:
     num_nodes: 1
     size: db-s-dev-database
     version: "12"
-

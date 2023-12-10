@@ -1,6 +1,9 @@
 application:
   host: 0.0.0.0
-#  those settings works if it's running on docker one network
+#  those settings work if it's running on docker one network
 #database:
 #  host: "172.19.0.3"
 #  port: 5432
+email_client:
+  base_url: "https://api.elasticemail.com/v2"
+  sender_email: "something@gmail.com"
