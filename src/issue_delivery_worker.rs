@@ -53,9 +53,10 @@ pub async fn try_execute_task(
     Span::current()
         .record("newsletter_issue_id", &display(issue_id))
         .record("subscriber_email", &display(&email));
+    let issue = get_issue(pool, issue_id).await?;
     match SubscriberEmail::parse(email.clone()) {
         Ok(email) => {
-            let issue = get_issue(pool, issue_id).await?;
+            // let issue = get_issue(pool, issue_id).await?;
             if let Err(e) = email_client
                 .send_email_elastic_mail(
                     &email,
@@ -82,7 +83,12 @@ pub async fn try_execute_task(
             );
         }
     }
-    delete_task(transaction, issue_id, &email).await?;
+
+    if issue.left_sending_tries == 5 {
+        delete_task(transaction, issue_id, &email).await?;
+    } else {
+        count_down_task_tryies(transaction, issue_id, &email).await?;
+    }
     Ok(ExecutionOutcome::TaskCompleted)
 }
 
@@ -90,6 +96,7 @@ struct NewsletterIssue {
     title: String,
     text_content: String,
     html_content: String,
+    left_sending_tries: i32,
 }
 
 #[tracing::instrument(skip_all)]
@@ -109,7 +116,7 @@ async fn get_issue(pool: &PgPool, issue_id: Uuid) -> Result<NewsletterIssue, any
     Ok(issue)
 }
 
-type PgTransaction = Transaction<'static, Postgres>;
+pub type PgTransaction = Transaction<'static, Postgres>;
 
 #[tracing::instrument(skip_all)]
 async fn dequeue_task(
@@ -158,5 +165,45 @@ async fn delete_task(
     .execute(transaction.deref_mut())
     .await?;
     transaction.commit().await?;
+    Ok(())
+}
+
+#[tracing::instrument(skip_app)]
+async fn count_down_task_tryies(
+    mut transaction: PgTransaction,
+    issue_id: Uuid,
+    email: &str,
+) -> Result<(), anyhow::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE
+            issue_delivery_queue
+        SET
+            left_sending_tries = $1
+        WHERE
+            newsletter_issue_id = $2
+        "#
+    )
+}
+
+pub async fn update_issue_delivery_left_tries(
+    transaction: &mut PgTransaction,
+    newsletter_issue_id: Uuid,
+    number_of_tries: i32
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE
+            issue_delivery_queue
+        SET
+            left_sending_tries = $1
+        WHERE
+            newsletter_issue_id = $2
+        "#,
+        number_of_tries,
+        newsletter_issue_id
+    )
+        .execute(transaction.deref_mut())
+        .await?;
     Ok(())
 }

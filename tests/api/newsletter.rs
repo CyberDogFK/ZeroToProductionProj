@@ -6,8 +6,27 @@ use std::time::Duration;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, MockBuilder, ResponseTemplate};
 
-fn when_sending_an_email() -> MockBuilder {
-    Mock::given(path("/email/send")).and(method("GET"))
+#[tokio::test]
+async fn newsletter_try_to_send_five_times() {
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await;
+    app.test_user.login(&app).await;
+
+    when_sending_an_email()
+        .respond_with(ResponseTemplate::new(500))
+        .expect(5)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
+    });
+    app.post_publish_newsletters(&newsletter_request_body).await;
+
+    app.dispatch_all_pending_emails().await;
 }
 
 #[tokio::test]
@@ -240,4 +259,8 @@ async fn create_confirmed_subscriber(app: &TestApp) {
         .unwrap()
         .error_for_status()
         .unwrap();
+}
+
+fn when_sending_an_email() -> MockBuilder {
+    Mock::given(path("/email/send")).and(method("GET"))
 }

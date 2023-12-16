@@ -10,6 +10,7 @@ use anyhow::Context;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use uuid::Uuid;
+use crate::issue_delivery_worker::update_issue_delivery_left_tries;
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -99,8 +100,9 @@ async fn insert_newsletter_issue(
 
 #[tracing::instrument(skip_all)]
 async fn enqueue_delivery_tasks(
-    transaction: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'static, Postgres>,
     newsletter_issue_id: Uuid,
+
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
@@ -116,5 +118,11 @@ async fn enqueue_delivery_tasks(
     )
     .execute(transaction.deref_mut())
     .await?;
+    update_issue_delivery_left_tries(
+        transaction,
+        newsletter_issue_id,
+        5)
+        .await?;
+
     Ok(())
 }
