@@ -10,7 +10,6 @@ use anyhow::Context;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use uuid::Uuid;
-use crate::issue_delivery_worker::update_issue_delivery_left_tries;
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -93,8 +92,8 @@ async fn insert_newsletter_issue(
         text_content,
         html_content
     )
-        .execute(transaction.deref_mut())
-        .await?;
+    .execute(transaction.deref_mut())
+    .await?;
     Ok(newsletter_issue_id)
 }
 
@@ -118,7 +117,7 @@ async fn enqueue_delivery_tasks(
         newsletter_issue_id,
         number_of_retry_tries
     )
-        .execute(transaction.deref_mut())
-        .await?;
+    .execute(transaction.deref_mut())
+    .await?;
     Ok(())
 }
