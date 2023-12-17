@@ -4,6 +4,7 @@ use crate::{configuration::Settings, startup::get_connection_pool};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use std::time::Duration;
+use chrono::{Timelike, Utc};
 use tracing::{field::display, Level, Span};
 use uuid::Uuid;
 
@@ -51,13 +52,37 @@ pub async fn try_execute_task(
     if task.is_none() {
         return Ok(ExecutionOutcome::EmptyQueue);
     }
-    let (transaction, issue_id, email, left_tries) = task.unwrap();
+    let (transaction, issue_delivery_queue) = task.unwrap();
+
+    // tokio::time::sleep(Duration::from_secs(1)).await;
+    if let Some(time) = issue_delivery_queue.execute_last_time {
+        tracing::event!(
+            name: "Execute last time",
+            Level::INFO,
+            "Execute last time {:?}", time);
+        let now = chrono::offset::Utc::now();
+        let now_seconds = now.timestamp_micros();
+        let time_seconds = time.timestamp_micros()
+            + (Duration::from_secs(issue_delivery_queue.execute_after_duration as u64).as_micros() as i64);
+        tracing::event!(
+            name: "Time seconds",
+            Level::INFO,
+            ?now_seconds,
+            ?time_seconds,
+            "Time seconds",
+        );
+        if time_seconds > now_seconds {
+            transaction.commit().await?;
+            return Ok(ExecutionOutcome::TaskPostponed);
+        }
+    }
+
     Span::current()
-        .record("newsletter_issue_id", &display(issue_id))
-        .record("subscriber_email", &display(&email));
-    let execution_outcome = match SubscriberEmail::parse(email.clone()) {
+        .record("newsletter_issue_id", &display(issue_delivery_queue.newsletter_issue_id))
+        .record("subscriber_email", &display(&issue_delivery_queue.subscriber_email));
+    let execution_outcome = match SubscriberEmail::parse(issue_delivery_queue.subscriber_email.clone()) {
         Ok(email) => {
-            let issue = get_issue(pool, issue_id).await?;
+            let issue = get_issue(pool, issue_delivery_queue.newsletter_issue_id).await?;
             if let Err(e) = email_client
                 .send_email_elastic_mail(
                     &email,
@@ -73,7 +98,7 @@ pub async fn try_execute_task(
                     "Failed to deliver issue to a confirmed subscriber. \
                     Skipping.\
                     Remaining number of tries: {}",
-                    left_tries
+                    issue_delivery_queue.left_sending_tries
                 );
                 ExecutionOutcome::TaskPostponed
             } else {
@@ -92,12 +117,25 @@ pub async fn try_execute_task(
     };
 
     if let ExecutionOutcome::TaskCompleted = execution_outcome {
-        delete_task(transaction, issue_id, &email).await?;
-    } else if left_tries <= 0 {
-        delete_task(transaction, issue_id, &email).await?;
+        delete_task(
+            transaction,
+            issue_delivery_queue.newsletter_issue_id,
+            &issue_delivery_queue.subscriber_email
+        ).await?;
+    } else if issue_delivery_queue.left_sending_tries <= 0 {
+        delete_task(
+            transaction,
+            issue_delivery_queue.newsletter_issue_id,
+            &issue_delivery_queue.subscriber_email
+        ).await?;
     } else {
-        let new_tries = left_tries - 1;
-        update_issue_delivery_left_tries(transaction, issue_id, email.as_ref(), new_tries).await?;
+        let new_tries = issue_delivery_queue.left_sending_tries - 1;
+        update_issue_delivery_left_tries(
+            transaction,
+            issue_delivery_queue.newsletter_issue_id,
+            issue_delivery_queue.subscriber_email.as_ref(),
+            new_tries
+        ).await?;
     }
     Ok(ExecutionOutcome::TaskCompleted)
 }
@@ -120,36 +158,50 @@ async fn get_issue(pool: &PgPool, issue_id: Uuid) -> Result<NewsletterIssue, any
         "#,
         issue_id
     )
-    .fetch_one(pool)
-    .await?;
+        .fetch_one(pool)
+        .await?;
     Ok(issue)
 }
 
 pub type PgTransaction = Transaction<'static, Postgres>;
 
+struct IssueDeliveryQueue {
+    newsletter_issue_id: Uuid,
+    subscriber_email: String,
+    left_sending_tries: i32,
+    execute_after_duration: i32,
+    execute_last_time: Option<chrono::DateTime<Utc>>,
+}
+
 #[tracing::instrument(skip_all)]
 async fn dequeue_task(
     pool: &PgPool,
-) -> Result<Option<(PgTransaction, Uuid, String, i32)>, anyhow::Error> {
+) -> Result<Option<(PgTransaction, IssueDeliveryQueue)>, anyhow::Error> {
     let mut transaction = pool.begin().await?;
-    let r = sqlx::query!(
+
+    let r = sqlx::query_as!(
+        IssueDeliveryQueue,
         r#"
-        SELECT newsletter_issue_id, subscriber_email, left_sending_tries
-        FROM issue_delivery_queue
+        SELECT
+            newsletter_issue_id,
+            subscriber_email,
+            left_sending_tries,
+            execute_after_duration,
+            execute_last_time
+        FROM
+            issue_delivery_queue
         FOR UPDATE
         SKIP LOCKED
         LIMIT 1
         "#,
     )
-    .fetch_optional(transaction.deref_mut())
-    .await?;
+        .fetch_optional(transaction.deref_mut())
+        .await?;
 
     if let Some(r) = r {
         Ok(Some((
             transaction,
-            r.newsletter_issue_id,
-            r.subscriber_email,
-            r.left_sending_tries,
+            r,
         )))
     } else {
         Ok(None)
@@ -172,8 +224,8 @@ async fn delete_task(
         issue_id,
         email
     )
-    .execute(transaction.deref_mut())
-    .await?;
+        .execute(transaction.deref_mut())
+        .await?;
     transaction.commit().await?;
     Ok(())
 }
@@ -190,7 +242,8 @@ pub async fn update_issue_delivery_left_tries(
         UPDATE
             issue_delivery_queue
         SET
-            left_sending_tries = $1
+            left_sending_tries = $1,
+            execute_last_time = now()
         WHERE
             newsletter_issue_id = $2 AND
             subscriber_email = $3
@@ -199,9 +252,9 @@ pub async fn update_issue_delivery_left_tries(
         newsletter_issue_id,
         subscriber_email
     )
-    .execute(transaction.deref_mut())
-    .await?
-    .rows_affected();
+        .execute(transaction.deref_mut())
+        .await?
+        .rows_affected();
     tracing::event!(
         name: "database",
         Level::INFO,
@@ -227,7 +280,7 @@ pub async fn get_issue_delivery_left_tries(
         newsletter_issue_id,
         email
     )
-    .fetch_one(transaction.deref_mut())
-    .await?;
+        .fetch_one(transaction.deref_mut())
+        .await?;
     Ok(left_tries.left_sending_tries)
 }

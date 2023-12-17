@@ -9,6 +9,7 @@ use actix_web_flash_messages::FlashMessage;
 use anyhow::Context;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
+use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -103,19 +104,22 @@ async fn enqueue_delivery_tasks(
     newsletter_issue_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     let number_of_retry_tries = 4;
+    let waiting_duration = 1i32;
     sqlx::query!(
         r#"
         INSERT INTO issue_delivery_queue (
             newsletter_issue_id,
             subscriber_email,
-            left_sending_tries
+            left_sending_tries,
+            execute_after_duration
         )
-        SELECT $1, email, $2
+        SELECT $1, email, $2, $3
         FROM subscriptions
         WHERE status = 'confirmed'
         "#,
         newsletter_issue_id,
-        number_of_retry_tries
+        number_of_retry_tries,
+        waiting_duration,
     )
     .execute(transaction.deref_mut())
     .await?;
