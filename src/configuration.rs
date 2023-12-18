@@ -10,6 +10,7 @@ use sqlx::ConnectOptions;
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub issue_delivery: IssueDeliverySettings,
     pub email_client: EmailClientSettings,
     pub redis_url: Secret<String>,
 }
@@ -24,6 +25,17 @@ pub struct ApplicationSettings {
 }
 
 #[derive(serde::Deserialize, Clone)]
+pub struct IssueDeliverySettings {
+    pub postponed_task_timeout_seconds: u64,
+}
+
+impl IssueDeliverySettings {
+    pub fn postponed_task_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.postponed_task_timeout_seconds)
+    }
+}
+
+#[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
@@ -34,12 +46,12 @@ pub struct EmailClientSettings {
 impl EmailClientSettings {
     pub fn client(self) -> EmailClient {
         let sender_email = self.sender().expect("Invalid sender email address.");
-        let timeout = self.timeout();
+        let server_timeout = self.server_timeout();
         EmailClient::new(
             self.base_url,
             sender_email,
             self.authorization_token,
-            timeout,
+            server_timeout,
         )
     }
 
@@ -47,7 +59,7 @@ impl EmailClientSettings {
         SubscriberEmail::parse(self.sender_email.clone())
     }
 
-    pub fn timeout(&self) -> std::time::Duration {
+    pub fn server_timeout(&self) -> std::time::Duration {
         std::time::Duration::from_millis(self.timeout_milliseconds)
     }
 }
@@ -106,26 +118,6 @@ impl DatabaseSettings {
             .database(&self.database_name)
             .log_statements(tracing::log::LevelFilter::Trace)
     }
-    // pub fn connection_string(&self) -> Secret<String> {
-    //     Secret::new(format!(
-    //         "postgres://{}:{}@{}:{}/{}",
-    //         self.username,
-    //         self.password.expose_secret(),
-    //         self.host,
-    //         self.port,
-    //         self.database_name
-    //     ))
-    // }
-    //
-    // pub fn connection_string_without_db(&self) -> Secret<String> {
-    //     Secret::new(format!(
-    //         "postgres://{}:{}@{}:{}",
-    //         self.username,
-    //         self.password.expose_secret(),
-    //         self.host,
-    //         self.port
-    //     ))
-    // }
 }
 
 pub enum Environment {

@@ -104,22 +104,20 @@ async fn enqueue_delivery_tasks(
     newsletter_issue_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     let number_of_retry_tries = 4;
-    let waiting_duration = 1i32;
+    // todo: number of retry tries move to configuration too
     sqlx::query!(
         r#"
         INSERT INTO issue_delivery_queue (
             newsletter_issue_id,
             subscriber_email,
-            left_sending_tries,
-            execute_after_duration
+            left_sending_tries
         )
-        SELECT $1, email, $2, $3
+        SELECT $1, email, $2
         FROM subscriptions
         WHERE status = 'confirmed'
         "#,
         newsletter_issue_id,
         number_of_retry_tries,
-        waiting_duration,
     )
     .execute(transaction.deref_mut())
     .await?;

@@ -4,20 +4,25 @@ use crate::{configuration::Settings, startup::get_connection_pool};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use std::time::Duration;
-use chrono::{Timelike, Utc};
+use chrono::Utc;
 use tracing::{field::display, Level, Span};
 use uuid::Uuid;
 
 pub async fn run_worker_until_stopped(configuration: Settings) -> Result<(), anyhow::Error> {
     let connection_pool = get_connection_pool(&configuration.database);
 
+    let postponed_task_timeout = configuration.issue_delivery.postponed_task_timeout();
     let email_client = configuration.email_client.client();
-    worker_loop(connection_pool, email_client).await
+    worker_loop(connection_pool, email_client, postponed_task_timeout).await
 }
 
-async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyhow::Error> {
+async fn worker_loop(
+    pool: PgPool,
+    email_client: EmailClient,
+    postponed_task_timeout: Duration,
+) -> Result<(), anyhow::Error> {
     loop {
-        match try_execute_task(&pool, &email_client).await {
+        match try_execute_task(&pool, &email_client, &postponed_task_timeout).await {
             Ok(ExecutionOutcome::EmptyQueue) => {
                 tokio::time::sleep(Duration::from_secs(10)).await;
             }
@@ -47,6 +52,7 @@ err
 pub async fn try_execute_task(
     pool: &PgPool,
     email_client: &EmailClient,
+    postponed_time_duration: &Duration,
 ) -> Result<ExecutionOutcome, anyhow::Error> {
     let task = dequeue_task(pool).await?;
     if task.is_none() {
@@ -58,20 +64,25 @@ pub async fn try_execute_task(
     if let Some(time) = issue_delivery_queue.execute_last_time {
         tracing::event!(
             name: "Execute last time",
-            Level::INFO,
+            Level::DEBUG,
             "Execute last time {:?}", time);
         let now = chrono::offset::Utc::now();
         let now_seconds = now.timestamp_micros();
         let time_seconds = time.timestamp_micros()
-            + (Duration::from_secs(issue_delivery_queue.execute_after_duration as u64).as_micros() as i64);
+            + (postponed_time_duration.as_micros() as i64);
         tracing::event!(
             name: "Time seconds",
-            Level::INFO,
+            Level::DEBUG,
             ?now_seconds,
             ?time_seconds,
             "Time seconds",
         );
         if time_seconds > now_seconds {
+            tracing::event!(
+                name: "Skipping execution",
+                Level::INFO,
+                "Skipping execution"
+            );
             transaction.commit().await?;
             return Ok(ExecutionOutcome::TaskPostponed);
         }
@@ -169,7 +180,6 @@ struct IssueDeliveryQueue {
     newsletter_issue_id: Uuid,
     subscriber_email: String,
     left_sending_tries: i32,
-    execute_after_duration: i32,
     execute_last_time: Option<chrono::DateTime<Utc>>,
 }
 
@@ -186,7 +196,6 @@ async fn dequeue_task(
             newsletter_issue_id,
             subscriber_email,
             left_sending_tries,
-            execute_after_duration,
             execute_last_time
         FROM
             issue_delivery_queue
