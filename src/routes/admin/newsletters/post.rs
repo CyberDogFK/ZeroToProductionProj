@@ -99,20 +99,24 @@ async fn insert_newsletter_issue(
 
 #[tracing::instrument(skip_all)]
 async fn enqueue_delivery_tasks(
-    transaction: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'static, Postgres>,
     newsletter_issue_id: Uuid,
 ) -> Result<(), sqlx::Error> {
+    let number_of_retry_tries = 4;
+    // todo: number of retry tries move to configuration too
     sqlx::query!(
         r#"
         INSERT INTO issue_delivery_queue (
             newsletter_issue_id,
-            subscriber_email
+            subscriber_email,
+            left_sending_tries
         )
-        SELECT $1, email
+        SELECT $1, email, $2
         FROM subscriptions
         WHERE status = 'confirmed'
         "#,
         newsletter_issue_id,
+        number_of_retry_tries,
     )
     .execute(transaction.deref_mut())
     .await?;

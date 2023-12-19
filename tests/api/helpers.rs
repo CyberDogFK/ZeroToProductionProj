@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::collections::HashMap;
+use std::time::Duration;
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::{get_configurations, DatabaseSettings};
@@ -20,6 +21,7 @@ pub struct TestApp {
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
     pub email_client: EmailClient,
+    pub postponed_task_timeout_seconds: Duration,
 }
 
 impl TestUser {
@@ -43,10 +45,13 @@ pub struct ConfirmationLinks {
 impl TestApp {
     pub async fn dispatch_all_pending_emails(&self) {
         loop {
-            if let ExecutionOutcome::EmptyQueue =
-                try_execute_task(&self.db_pool, &self.email_client)
-                    .await
-                    .unwrap()
+            if let ExecutionOutcome::EmptyQueue = try_execute_task(
+                &self.db_pool,
+                &self.email_client,
+                &self.postponed_task_timeout_seconds,
+            )
+            .await
+            .unwrap()
             {
                 break;
             }
@@ -204,6 +209,7 @@ pub async fn spawn_app() -> TestApp {
         c.database.database_name = Uuid::new_v4().to_string();
         c.application.port = 0;
         c.email_client.base_url = email_server.uri();
+        c.issue_delivery.postponed_task_timeout_seconds = 1;
         c
     };
 
@@ -213,7 +219,6 @@ pub async fn spawn_app() -> TestApp {
     let application = Application::build(configuration.clone())
         .await
         .expect("Failed to build application");
-    // let address = format!("http://127.0.0.1:{}", application.port());
     let application_port = application.port();
     let _ = tokio::spawn(application.run_until_stopped()); // droping in the end, maybe good for desktop???
 
@@ -231,6 +236,7 @@ pub async fn spawn_app() -> TestApp {
         test_user: TestUser::generate(),
         api_client: client,
         email_client: configuration.email_client.client(),
+        postponed_task_timeout_seconds: configuration.issue_delivery.postponed_task_timeout(),
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app

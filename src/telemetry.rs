@@ -14,16 +14,10 @@ where
 
     let formatting_layer = BunyanFormattingLayer::new(name, sink);
 
-    // let compact = format().with_thread_names(true);
-    //
-    // let layer = Layer::new()
-    //     .with_writer(sink)
-    //     .event_format(compact);
     Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(formatting_layer)
-    // .with(layer);
 }
 
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {

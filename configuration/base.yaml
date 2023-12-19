@@ -14,4 +14,7 @@ email_client:
   sender_email: "test@gmail.com"
   authorization_token: "E662D7B5D5A0B30F0A10AD0B3B06FDA36C1EBC2C52E238E4EE54F90C85CDA3539A9551B6B563495E554BF3119C5D7A06"
   timeout_milliseconds: 10000
+  postponed_task_timeout_seconds: 100
+issue_delivery:
+  postponed_task_timeout_seconds: 100
 redis_url: "redis://127.0.0.1:6379"

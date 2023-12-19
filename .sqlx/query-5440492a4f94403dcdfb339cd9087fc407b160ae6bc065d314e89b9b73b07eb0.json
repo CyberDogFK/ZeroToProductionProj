@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            newsletter_issue_id,\n            subscriber_email,\n            left_sending_tries,\n            execute_last_time\n        FROM\n            issue_delivery_queue\n        FOR UPDATE\n        SKIP LOCKED\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "newsletter_issue_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subscriber_email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "left_sending_tries",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "execute_last_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "5440492a4f94403dcdfb339cd9087fc407b160ae6bc065d314e89b9b73b07eb0"
+}
