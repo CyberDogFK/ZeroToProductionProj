@@ -45,10 +45,13 @@ pub struct ConfirmationLinks {
 impl TestApp {
     pub async fn dispatch_all_pending_emails(&self) {
         loop {
-            if let ExecutionOutcome::EmptyQueue =
-                try_execute_task(&self.db_pool, &self.email_client, &self.postponed_task_timeout_seconds)
-                    .await
-                    .unwrap()
+            if let ExecutionOutcome::EmptyQueue = try_execute_task(
+                &self.db_pool,
+                &self.email_client,
+                &self.postponed_task_timeout_seconds,
+            )
+            .await
+            .unwrap()
             {
                 break;
             }
@@ -233,7 +236,7 @@ pub async fn spawn_app() -> TestApp {
         test_user: TestUser::generate(),
         api_client: client,
         email_client: configuration.email_client.client(),
-        postponed_task_timeout_seconds: configuration.issue_delivery.postponed_task_timeout()
+        postponed_task_timeout_seconds: configuration.issue_delivery.postponed_task_timeout(),
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app

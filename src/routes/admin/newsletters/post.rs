@@ -9,7 +9,6 @@ use actix_web_flash_messages::FlashMessage;
 use anyhow::Context;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
-use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]

@@ -6,25 +6,6 @@ use std::time::Duration;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, MockBuilder, ResponseTemplate};
 
-// #[tokio::test]
-async fn newsletter_retrying_wait_for_some_time() {
-    let app = spawn_app().await;
-    create_confirmed_subscriber(&app).await;
-    app.test_user.login(&app).await;
-
-    when_sending_an_email()
-        .respond_with(ResponseTemplate::new(500))
-        .expect(2)
-        .mount(&app.email_server)
-        .await;
-
-    let newsletter_body = get_newsletter_request_body();
-
-    app.post_publish_newsletters(&newsletter_body).await;
-
-    app.dispatch_all_pending_emails().await;
-}
-
 #[tokio::test]
 async fn newsletter_try_to_send_five_times() {
     let app = spawn_app().await;
@@ -221,7 +202,7 @@ async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
         .expect(1)
         .mount_as_scoped(&app.email_server)
         .await;
-    app.post_subscriptions(body.into())
+    app.post_subscriptions(body)
         .await
         .error_for_status()
         .unwrap();
